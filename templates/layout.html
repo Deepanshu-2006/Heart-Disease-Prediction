@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heart Disease AI Portal</title>
+    <meta name="description" content="AI-powered heart disease risk prediction portal with personalized health insights.">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <!-- CDN Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.2/dist/confetti.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+    <div class="background-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    {% if user %}
+    <nav class="sidebar glass-panel-nav animate-fade-in">
+        <div class="user-profile">
+            <img src="{{ user.picture }}" alt="Profile" class="avatar">
+            <div class="user-info">
+                <h3>{{ user.name }}</h3>
+                <p>Cardiology Portal</p>
+            </div>
+        </div>
+
+
+
+        <!-- Dark/Light Mode Toggle -->
+        <div class="theme-toggle" id="themeToggle" onclick="toggleTheme()">
+            <span id="themeLabel">🌙 Dark Mode</span>
+            <div class="toggle-track"><div class="toggle-thumb"></div></div>
+        </div>
+
+        <ul class="nav-links">
+            <li><a href="{{ url_for('dashboard') }}" class="nav-item">🏠 Dashboard</a></li>
+            <li><a href="{{ url_for('predict_page') }}" class="nav-item">🔬 New Prediction</a></li>
+            <li><a href="{{ url_for('logout') }}" class="nav-item logout">🚪 Sign Out</a></li>
+        </ul>
+    </nav>
+    {% endif %}
+
+    <main class="main-content {% if not user %}full-width-content{% endif %}">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+    <script>
+        function toggleTheme() {
+            document.body.classList.toggle('light-mode');
+            const isLight = document.body.classList.contains('light-mode');
+            document.getElementById('themeLabel').textContent = isLight ? '☀️ Light Mode' : '🌙 Dark Mode';
+            localStorage.setItem('theme', isLight ? 'light' : 'dark');
+        }
+        if (localStorage.getItem('theme') === 'light') {
+            document.body.classList.add('light-mode');
+            const label = document.getElementById('themeLabel');
+            if (label) label.textContent = '☀️ Light Mode';
+        }
+    </script>
+
+    {% if user %}
+    <!-- ===== CARDIOBOT FLOATING CHAT ===== -->
+    <div id="chatbot-fab" class="chatbot-fab" onclick="toggleChat()" title="Ask CardioBot">
+        <span>💬</span>
+        <span class="chatbot-fab-label">CardioBot</span>
+        <span id="chatbot-notif" class="chatbot-notif hidden">1</span>
+    </div>
+
+    <div id="chatbot-panel" class="chatbot-panel">
+        <div class="chatbot-header">
+            <div class="chatbot-header-info">
+                <div class="chatbot-avatar-wrap">
+                    <span class="chatbot-avatar-emoji">🤖</span>
+                    <span class="chatbot-online-dot"></span>
+                </div>
+                <div>
+                    <div class="chatbot-name">CardioBot</div>
+                    <div class="chatbot-status">AI Heart Health Assistant</div>
+                </div>
+            </div>
+            <div class="chatbot-header-actions">
+                <button class="chatbot-action-btn" onclick="clearChat()" title="Clear chat">🗑️</button>
+                <button class="chatbot-action-btn" onclick="closeChat()" title="Close">✕</button>
+            </div>
+        </div>
+
+        <div class="chatbot-messages" id="chatbot-messages">
+            <div class="chatbot-msg bot">
+                <span class="msg-avatar">🤖</span>
+                <div class="msg-bubble">
+                    Hi <strong>{{ user.name }}</strong>! 👋 I'm <strong>CardioBot</strong>, your AI heart health assistant.<br><br>
+                    Ask me anything about:
+                    <ul style="margin:0.4rem 0 0 1rem; font-size:0.85rem; opacity:0.9;">
+                        <li>The form inputs &amp; what they mean</li>
+                        <li>Heart disease risks &amp; symptoms</li>
+                        <li>Prevention, diet &amp; lifestyle</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="chatbot-suggestions" id="chatbot-suggestions">
+            <button onclick="sendSuggestion('What is cholesterol and why does it matter?')">🩸 Cholesterol?</button>
+            <button onclick="sendSuggestion('What does resting blood pressure mean?')">💉 Blood Pressure?</button>
+            <button onclick="sendSuggestion('How can I prevent heart disease?')">❤️ Prevention tips</button>
+            <button onclick="sendSuggestion('What is chest pain type in the form?')">💔 Chest pain types?</button>
+        </div>
+
+        <div class="chatbot-input-row">
+            <textarea id="chatbot-input" class="chatbot-input" placeholder="Ask about heart health..." rows="1"
+                onkeydown="handleChatKey(event)" oninput="autoResizeTextarea(this)"></textarea>
+            <button class="chatbot-send-btn" id="chatbot-send-btn" onclick="sendChatMessage()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+    let chatHistory = [];
+    let chatOpen    = false;
+    let firstOpen   = true;
+
+    const _panel = document.getElementById('chatbot-panel');
+    const _fab   = document.getElementById('chatbot-fab');
+    const _notif = document.getElementById('chatbot-notif');
+
+    function openChat() {
+        chatOpen = true;
+        _panel.classList.add('chatbot-open');
+        _fab.classList.add('chatbot-fab-active');
+        _notif.classList.add('hidden');
+        if (firstOpen) { firstOpen = false; setTimeout(scrollChatBottom, 100); }
+        setTimeout(() => document.getElementById('chatbot-input').focus(), 150);
+    }
+
+    function closeChat() {
+        chatOpen = false;
+        _panel.classList.remove('chatbot-open');
+        _fab.classList.remove('chatbot-fab-active');
+    }
+
+    function toggleChat() {
+        chatOpen ? closeChat() : openChat();
+    }
+
+    function clearChat() {
+        chatHistory = [];
+        document.getElementById('chatbot-messages').innerHTML =
+            `<div class="chatbot-msg bot">
+                <span class="msg-avatar">🤖</span>
+                <div class="msg-bubble">Chat cleared! How can I help you? 😊</div>
+             </div>`;
+        document.getElementById('chatbot-suggestions').classList.remove('hidden');
+    }
+
+    function autoResizeTextarea(el) {
+        el.style.height = 'auto';
+        el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+    }
+
+    function handleChatKey(e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
+    }
+
+    function sendSuggestion(text) {
+        document.getElementById('chatbot-suggestions').classList.add('hidden');
+        document.getElementById('chatbot-input').value = text;
+        sendChatMessage();
+    }
+
+    function appendMsg(role, html, isTyping = false) {
+        const msgs = document.getElementById('chatbot-messages');
+        const wrap = document.createElement('div');
+        wrap.className = 'chatbot-msg ' + role;
+        if (isTyping) wrap.id = 'typing-indicator';
+        wrap.innerHTML = role === 'bot'
+            ? `<span class="msg-avatar">🤖</span><div class="msg-bubble">${html}</div>`
+            : `<div class="msg-bubble">${html}</div>`;
+        msgs.appendChild(wrap);
+        scrollChatBottom();
+        return wrap;
+    }
+
+    function scrollChatBottom() {
+        const msgs = document.getElementById('chatbot-messages');
+        msgs.scrollTop = msgs.scrollHeight;
+    }
+
+    function formatBotText(text) {
+        return text
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g,     '<em>$1</em>')
+            .replace(/`(.*?)`/g,       '<code>$1</code>')
+            .replace(/^#{1,3} (.+)$/gm,'<strong style="color:var(--accent)">$1</strong>')
+            .replace(/^[-•] (.+)$/gm,  '• $1')
+            .replace(/\n\n/g, '<br><br>')
+            .replace(/\n/g,   '<br>');
+    }
+
+    async function sendChatMessage() {
+        const input   = document.getElementById('chatbot-input');
+        const sendBtn = document.getElementById('chatbot-send-btn');
+        const message = input.value.trim();
+        if (!message) return;
+
+        input.value = '';
+        input.style.height = 'auto';
+        document.getElementById('chatbot-suggestions').classList.add('hidden');
+
+        appendMsg('user', escapeHtml(message));
+        chatHistory.push({ role: 'user', content: message });
+
+        const typingEl = appendMsg('bot',
+            `<div class="typing-dots"><span></span><span></span><span></span></div>`, true);
+        sendBtn.disabled = true;
+        input.disabled   = true;
+
+        try {
+            const res  = await fetch('/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message, history: chatHistory.slice(0, -1) })
+            });
+            const data = await res.json();
+            typingEl.remove();
+            if (data.success) {
+                chatHistory.push({ role: 'bot', content: data.reply });
+                appendMsg('bot', formatBotText(data.reply));
+            } else {
+                appendMsg('bot', `⚠️ ${escapeHtml(data.error || 'Something went wrong.')}`);
+            }
+        } catch {
+            typingEl.remove();
+            appendMsg('bot', '⚠️ Network error. Please try again.');
+        } finally {
+            sendBtn.disabled = false;
+            input.disabled   = false;
+            input.focus();
+        }
+    }
+
+    function escapeHtml(t) {
+        return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    setTimeout(() => { if (!chatOpen) _notif.classList.remove('hidden'); }, 3000);
+    </script>
+    {% endif %}
+</body>
+</html>

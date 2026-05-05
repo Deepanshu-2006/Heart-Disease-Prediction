@@ -1,0 +1,283 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<!-- Animated ECG Header -->
+<div class="ekg-header">
+    <svg viewBox="0 0 1000 40" preserveAspectRatio="none">
+        <polyline points="0,20 250,20 280,5 300,35 320,2 340,38 360,20 1000,20" />
+    </svg>
+</div>
+
+<div class="dashboard-header animate-slide-up">
+    <div class="header-glass">
+        <h2>Hi, <span class="accent">{{ user.name }}</span> 👋</h2>
+        <p>Your recent diagnostic analyses are synchronized securely below.</p>
+    </div>
+    <a href="{{ url_for('predict_page') }}" class="submit-btn new-pred-btn">🔬 Run New Analysis</a>
+</div>
+
+{% if history %}
+<!-- History Risk Chart -->
+<div class="chart-section animate-slide-up stagger-1">
+    <h3>📈 Your Risk Trend</h3>
+    <canvas id="riskChart" height="80"></canvas>
+</div>
+{% endif %}
+
+<div class="history-grid">
+    {% if history %}
+        {% for record in history %}
+        <div class="history-card glass-panel-sm animate-slide-up" style="animation-delay: {{ loop.index0 * 0.08 }}s;">
+            <div class="card-header">
+                <span class="date">🕐 {{ record.timestamp.strftime('%b %d, %Y %H:%M') }}</span>
+                {% set prob = record.probability * 100 %}
+                {% if record.prediction_result == 1 and prob >= 70 %}
+                    <span class="badge badge-high">🔴 High Risk</span>
+                {% elif record.prediction_result == 1 %}
+                    <span class="badge badge-med">🟡 Moderate Risk</span>
+                {% else %}
+                    <span class="badge badge-low">🟢 Low Risk</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <div class="stat-row">
+                    <span class="stat-label">❤️ Risk Probability</span>
+                    <span class="stat-val" style="color: {% if record.prediction_result == 1 %}#fca5a5{% else %}#86efac{% endif %}">{{ (record.probability * 100)|round(1) }}%</span>
+                </div>
+                <hr class="card-divider">
+                <div class="vital-tags">
+                    <span class="tag">🎂 Age: {{ record.age|int }}</span>
+                    <span class="tag">💓 BPM: {{ record.thalach|int }}</span>
+                    <span class="tag">🩸 Chol: {{ record.chol|int }}</span>
+                    {% if record.trestbps %}<span class="tag">💉 BP: {{ record.trestbps|int }}</span>{% endif %}
+                </div>
+            </div>
+            <!-- Card Actions -->
+            <div class="card-actions">
+                <button class="view-test-btn" onclick='openTestModal({{ {
+                    "date": record.timestamp.strftime("%b %d, %Y %H:%M"),
+                    "result": record.prediction_result,
+                    "prob": (record.probability * 100)|round(1),
+                    "age": record.age|int,
+                    "sex": record.sex|int,
+                    "cp": record.cp|int,
+                    "trestbps": record.trestbps|int if record.trestbps else 0,
+                    "chol": record.chol|int,
+                    "fbs": record.fbs|int if record.fbs else 0,
+                    "restecg": record.restecg|int if record.restecg else 0,
+                    "thalach": record.thalach|int,
+                    "exang": record.exang|int if record.exang else 0,
+                    "oldpeak": record.oldpeak if record.oldpeak else 0,
+                    "slope": record.slope|int if record.slope else 0,
+                    "ca": record.ca|int if record.ca else 0,
+                    "thal": record.thal|int if record.thal else 0
+                } | tojson }})'>
+                    🔍 View Full Test
+                </button>
+                <button class="delete-test-btn" onclick="deleteRecord({{ record.id }}, this)">
+                    🗑️ Delete
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty-state glass-panel-sm animate-slide-up stagger-1">
+            <div class="icon">🫀</div>
+            <h3>No results yet</h3>
+            <p>Run your first analysis to see results here!</p>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Footer Disclaimer -->
+<div class="footer-disclaimer">
+    ⚠️ <strong>Medical Disclaimer:</strong> This tool is for educational and research purposes only. It does not provide medical advice. Always consult a qualified doctor or healthcare professional before making any health decisions.
+</div>
+
+<!-- ===== FULL TEST MODAL ===== -->
+<div id="testModal" class="modal-overlay hidden" onclick="closeModalOutside(event)">
+    <div class="modal-box glass-panel">
+        <div class="modal-header">
+            <div>
+                <h2 id="modal-title">Full Test Report</h2>
+                <p id="modal-date" class="modal-date"></p>
+            </div>
+            <button class="modal-close" onclick="closeTestModal()">✕</button>
+        </div>
+
+        <!-- Risk Banner -->
+        <div id="modal-risk-banner" class="modal-risk-banner"></div>
+
+        <!-- Vitals Grid -->
+        <div class="modal-section">
+            <h3 class="modal-section-title">📋 Patient Vitals</h3>
+            <div class="modal-vitals-grid" id="modal-vitals-grid"></div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="result-actions" style="margin-top:1.5rem;">
+            <button class="action-btn" onclick="downloadHistoryPDF()">📄 Download PDF Report</button>
+            <a href="{{ url_for('predict_page') }}" class="action-btn">🔬 Run New Analysis</a>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentModalData = null;
+
+const CP_LABELS = ['Typical Angina','Atypical Angina','Non-anginal Pain','Asymptomatic'];
+const THAL_LABELS = {0:'Normal',1:'Fixed Defect',2:'Reversible Defect',3:'Unknown'};
+const SLOPE_LABELS = {0:'Upsloping',1:'Flat',2:'Downsloping'};
+const RESTECG_LABELS = {0:'Normal',1:'ST Abnormality',2:'LV Hypertrophy'};
+
+async function deleteRecord(id, btn) {
+    if (!confirm('Delete this test result? This cannot be undone.')) return;
+
+    btn.disabled = true;
+    btn.textContent = '⏳';
+
+    try {
+        const res = await fetch(`/prediction/${id}/delete`, { method: 'POST' });
+        const data = await res.json();
+        if (data.success) {
+            // Fade + shrink the card out
+            const card = btn.closest('.history-card');
+            card.style.transition = 'opacity 0.35s ease, transform 0.35s ease, max-height 0.4s ease, margin 0.4s ease, padding 0.4s ease';
+            card.style.opacity = '0';
+            card.style.transform = 'scale(0.92)';
+            card.style.maxHeight = card.offsetHeight + 'px';
+            setTimeout(() => {
+                card.style.maxHeight = '0';
+                card.style.margin = '0';
+                card.style.padding = '0';
+                card.style.overflow = 'hidden';
+            }, 350);
+            setTimeout(() => {
+                card.remove();
+                // If no cards left, show empty state
+                const grid = document.querySelector('.history-grid');
+                if (!grid.querySelector('.history-card')) {
+                    grid.innerHTML = `
+                        <div class="empty-state glass-panel-sm">
+                            <div class="icon">🫀</div>
+                            <h3>No results yet</h3>
+                            <p>Run your first analysis to see results here!</p>
+                        </div>`;
+                }
+            }, 750);
+        } else {
+            alert('Error: ' + (data.error || 'Could not delete.'));
+            btn.disabled = false;
+            btn.textContent = '🗑️ Delete';
+        }
+    } catch {
+        alert('Network error. Please try again.');
+        btn.disabled = false;
+        btn.textContent = '🗑️ Delete';
+    }
+}
+
+
+
+function openTestModal(data) {
+    currentModalData = data;
+    document.getElementById('modal-date').textContent = '🕐 ' + data.date;
+
+    const isHigh = data.result === 1 && data.prob >= 70;
+    const isMed  = data.result === 1 && data.prob < 70;
+    const label  = isHigh ? '🔴 High Risk' : isMed ? '🟡 Moderate Risk' : '🟢 Low Risk';
+    const color  = isHigh ? '#ef4444' : isMed ? '#f59e0b' : '#10b981';
+    const bgColor= isHigh ? 'rgba(239,68,68,0.12)' : isMed ? 'rgba(245,158,11,0.12)' : 'rgba(16,185,129,0.12)';
+
+    document.getElementById('modal-title').textContent = label + ' — ' + data.prob + '% Risk';
+    const banner = document.getElementById('modal-risk-banner');
+    banner.style.background = bgColor;
+    banner.style.borderColor = color;
+    banner.style.color = color;
+    banner.innerHTML = `<strong style="font-size:1.4rem">${data.prob}%</strong> Heart Disease Risk Probability`;
+
+    const sexLabel = data.sex === 1 ? 'Male' : 'Female';
+    const fbsLabel = data.fbs === 1 ? 'Yes (>120 mg/dl)' : 'No';
+    const exangLabel = data.exang === 1 ? 'Yes' : 'No';
+    const cpLabel = CP_LABELS[data.cp] || data.cp;
+    const thalLabel = THAL_LABELS[data.thal] || data.thal;
+    const slopeLabel = SLOPE_LABELS[data.slope] || data.slope;
+    const restecgLabel = RESTECG_LABELS[data.restecg] || data.restecg;
+
+    const vitals = [
+        { icon:'🎂', label:'Age', value: data.age + ' years' },
+        { icon:'⚧', label:'Sex', value: sexLabel },
+        { icon:'💔', label:'Chest Pain Type', value: cpLabel },
+        { icon:'💉', label:'Resting Blood Pressure', value: data.trestbps + ' mmHg' },
+        { icon:'🩸', label:'Cholesterol', value: data.chol + ' mg/dl' },
+        { icon:'🍬', label:'Fasting Blood Sugar > 120', value: fbsLabel },
+        { icon:'📟', label:'Resting ECG', value: restecgLabel },
+        { icon:'💓', label:'Max Heart Rate', value: data.thalach + ' BPM' },
+        { icon:'🏃', label:'Exercise-Induced Angina', value: exangLabel },
+        { icon:'📉', label:'ST Depression (Oldpeak)', value: data.oldpeak },
+        { icon:'📈', label:'ST Slope', value: slopeLabel },
+        { icon:'🫀', label:'Major Vessels (CA)', value: data.ca },
+        { icon:'🧬', label:'Thalassemia', value: thalLabel },
+    ];
+
+    const grid = document.getElementById('modal-vitals-grid');
+    grid.innerHTML = vitals.map(v => `
+        <div class="modal-vital-item">
+            <span class="modal-vital-icon">${v.icon}</span>
+            <span class="modal-vital-label">${v.label}</span>
+            <span class="modal-vital-value">${v.value}</span>
+        </div>
+    `).join('');
+
+    document.getElementById('testModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeTestModal() {
+    document.getElementById('testModal').classList.add('hidden');
+    document.body.style.overflow = '';
+}
+
+function closeModalOutside(e) {
+    if (e.target === document.getElementById('testModal')) closeTestModal();
+}
+
+function downloadHistoryPDF() {
+    if (!currentModalData) return;
+    generateMedicalPDF(currentModalData);
+}
+
+
+{% if history %}
+// Chart.js Risk Trend
+const labels = [{% for r in history|reverse %}"{{ r.timestamp.strftime('%b %d') }}"{% if not loop.last %},{% endif %}{% endfor %}];
+const data = [{% for r in history|reverse %}{{ (r.probability * 100)|round(1) }}{% if not loop.last %},{% endif %}{% endfor %}];
+const ctx = document.getElementById('riskChart').getContext('2d');
+new Chart(ctx, {
+    type: 'line',
+    data: {
+        labels: labels,
+        datasets: [{
+            label: 'Risk % over time',
+            data: data,
+            borderColor: '#3b82f6',
+            backgroundColor: 'rgba(59,130,246,0.1)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.4,
+            pointBackgroundColor: data.map(v => v >= 50 ? '#ef4444' : '#10b981'),
+            pointRadius: 5
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            y: { min: 0, max: 100, grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', callback: v => v + '%' } },
+            x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }
+        }
+    }
+});
+{% endif %}
+</script>
+{% endblock %}

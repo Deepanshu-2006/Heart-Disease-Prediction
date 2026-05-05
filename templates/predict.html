@@ -1,0 +1,333 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<div class="glass-panel predict-panel animate-slide-up">
+    <header>
+        <h1>Hi <span class="accent">{{ user.name }},</span></h1>
+        <p>Enter your vitals — our AI handles the rest</p>
+    </header>
+
+    <!-- AI Info Banner -->
+    <div class="ai-info-banner">
+        <span class="ai-info-icon">⚡</span>
+        <div>
+            <strong>Flexible Prediction Mode</strong> — Fill in your basic vitals for a quick assessment. 
+            If you have a medical report, add **Advanced Markers** to boost the AI's confidence.
+        </div>
+    </div>
+
+    <!-- Accuracy/Confidence Meter -->
+    <div class="confidence-meter-box">
+        <div class="meter-header">
+            <span>📊 Prediction Confidence</span>
+            <span id="data-completeness">Basic (6/13)</span>
+        </div>
+        <div class="meter-bar">
+            <div id="confidence-fill" class="confidence-fill" style="width: 46%;"></div>
+        </div>
+        <p class="meter-note">Add more clinical data to increase analysis precision.</p>
+    </div>
+
+    <!-- BMI Calculator -->
+    <div class="bmi-section">
+        <h4>🧮 Quick BMI Calculator</h4>
+        <div class="bmi-grid">
+            <div class="input-group">
+                <label>Height (cm)</label>
+                <input type="number" id="bmi-height" placeholder="e.g. 170" min="100" max="250">
+            </div>
+            <div class="input-group">
+                <label>Weight (kg)</label>
+                <input type="number" id="bmi-weight" placeholder="e.g. 70" min="20" max="300">
+            </div>
+            <div id="bmi-result" class="bmi-result-badge">BMI: —</div>
+        </div>
+    </div>
+
+    <form id="prediction-form">
+        <div class="form-section-label">📋 Basic Vitals <span class="badge-required" style="background: #10b981;">Required</span></div>
+        <div class="form-grid">
+            <!-- 1. Age -->
+            <div class="input-group">
+                <label for="age">🎂 Age</label>
+                <div class="range-row">
+                    <input type="range" id="age-range" min="1" max="100" value="45" oninput="syncRange('age', this.value); updateConfidence()">
+                    <span class="range-value" id="age-display">45</span>
+                </div>
+                <input type="number" id="age" name="age" required min="1" max="120" value="45"
+                       oninput="syncRange('age-range', this.value); document.getElementById('age-display').textContent = this.value; updateConfidence()">
+            </div>
+
+            <!-- 2. Sex -->
+            <div class="input-group">
+                <label for="sex">⚧ Sex</label>
+                <select id="sex" name="sex" required onchange="updateConfidence()">
+                    <option value="1">Male</option>
+                    <option value="0">Female</option>
+                </select>
+            </div>
+
+            <!-- 3. Chest Pain Type -->
+            <div class="input-group">
+                <label for="cp">💔 Chest Pain Type</label>
+                <select id="cp" name="cp" required onchange="updateConfidence()">
+                    <option value="0">Typical Angina</option>
+                    <option value="1">Atypical Angina</option>
+                    <option value="2">Non-anginal</option>
+                    <option value="3">Asymptomatic</option>
+                </select>
+            </div>
+
+            <!-- 4. Resting Blood Pressure -->
+            <div class="input-group">
+                <label for="trestbps">💉 Blood Pressure (mmHg)</label>
+                <div class="range-row">
+                    <input type="range" id="trestbps-range" min="80" max="200" value="120" oninput="syncRange('trestbps', this.value); updateConfidence()">
+                    <span class="range-value" id="trestbps-display">120</span>
+                </div>
+                <input type="number" id="trestbps" name="trestbps" required value="120"
+                       oninput="syncRange('trestbps-range', this.value); document.getElementById('trestbps-display').textContent = this.value; updateConfidence()">
+            </div>
+
+            <!-- 5. Cholesterol -->
+            <div class="input-group">
+                <label for="chol">🩸 Cholesterol (mg/dl)</label>
+                <div class="range-row">
+                    <input type="range" id="chol-range" min="100" max="500" value="200" oninput="syncRange('chol', this.value); updateConfidence()">
+                    <span class="range-value" id="chol-display">200</span>
+                </div>
+                <input type="number" id="chol" name="chol" required value="200"
+                       oninput="syncRange('chol-range', this.value); document.getElementById('chol-display').textContent = this.value; updateConfidence()">
+            </div>
+
+            <!-- 6. Max Heart Rate -->
+            <div class="input-group">
+                <label for="thalach">💓 Max Heart Rate</label>
+                <div class="range-row">
+                    <input type="range" id="thalach-range" min="60" max="220" value="150" oninput="syncRange('thalach', this.value); updateConfidence()">
+                    <span class="range-value" id="thalach-display">150</span>
+                </div>
+                <input type="number" id="thalach" name="thalach" required value="150"
+                       oninput="syncRange('thalach-range', this.value); document.getElementById('thalach-display').textContent = this.value; updateConfidence()">
+            </div>
+        </div>
+
+        <!-- Toggle for Advanced Fields -->
+        <div class="advanced-toggle-wrap">
+            <button type="button" class="advanced-toggle-btn" onclick="toggleAdvanced()">
+                <span id="toggle-icon">➕</span> I have a Medical Report (Advanced Data)
+            </button>
+        </div>
+
+        <div id="advanced-section" class="hidden">
+            <div class="form-section-label">🧬 Advanced Clinical Markers <span class="badge-required" style="background: #3b82f6;">Optional</span></div>
+            <div class="form-grid">
+                <div class="input-group">
+                    <label for="fbs">🩸 Fasting Blood Sugar > 120?</label>
+                    <select id="fbs" name="fbs" onchange="updateConfidence()">
+                        <option value="">Don't Know</option>
+                        <option value="0">No (<= 120)</option>
+                        <option value="1">Yes (> 120)</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label for="restecg">📊 Resting ECG Result</label>
+                    <select id="restecg" name="restecg" onchange="updateConfidence()">
+                        <option value="">Don't Know</option>
+                        <option value="0">Normal</option>
+                        <option value="1">ST-T Abnormality</option>
+                        <option value="2">LV Hypertrophy</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label for="exang">🏃 Exercise Angina</label>
+                    <select id="exang" name="exang" onchange="updateConfidence()">
+                        <option value="">Don't Know</option>
+                        <option value="0">No</option>
+                        <option value="1">Yes</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label for="oldpeak">📉 ST Depression (Oldpeak)</label>
+                    <input type="number" id="oldpeak" name="oldpeak" step="0.1" placeholder="e.g. 1.5" oninput="updateConfidence()">
+                </div>
+
+                <div class="input-group">
+                    <label for="slope">📈 ST Slope Type</label>
+                    <select id="slope" name="slope" onchange="updateConfidence()">
+                        <option value="">Don't Know</option>
+                        <option value="0">Upsloping</option>
+                        <option value="1">Flat</option>
+                        <option value="2">Downsloping</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label for="ca">🚢 Major Vessels (0-3)</label>
+                    <select id="ca" name="ca" onchange="updateConfidence()">
+                        <option value="">Don't Know</option>
+                        <option value="0">0</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                        <option value="3">3</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label for="thal">🔬 Thalassemia Result</label>
+                    <select id="thal" name="thal" onchange="updateConfidence()">
+                        <option value="">Don't Know</option>
+                        <option value="1">Normal</option>
+                        <option value="2">Fixed Defect</option>
+                        <option value="3">Reversible Defect</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="ai-infer-note" style="margin-top: 1.5rem;">
+            <span>💡</span>
+            <span>If you leave optional fields as "Don't Know", our AI will use population statistics from its <strong>920-patient database</strong> to provide the best estimate.</span>
+        </div>
+
+        <button type="submit" class="submit-btn creative-btn" id="predictBtn" style="margin-top: 1rem;">
+            <span class="btn-text">🔬 Run Risk Analysis</span>
+        </button>
+    </form>
+
+    <!-- EKG Animation -->
+    <div id="ekg-container" class="hidden">
+        <svg class="ekg-line" viewBox="0 0 500 100">
+            <polyline points="0,50 150,50 170,20 190,90 210,10 230,70 250,50 500,50" />
+        </svg>
+        <p class="scanning-text" id="scanningText">Running AI Analysis...</p>
+    </div>
+
+    <!-- Result Section -->
+    <div id="result-section" class="result-glass hidden">
+        <h2 id="result-title">Analysis Complete</h2>
+        <div class="gauge-wrapper">
+            <svg class="gauge-svg" viewBox="0 0 200 120">
+                <path class="gauge-bg" d="M20,100 A80,80 0 0,1 180,100" stroke-dasharray="251" stroke-dashoffset="0"/>
+                <path class="gauge-fill" id="gauge-path" d="M20,100 A80,80 0 0,1 180,100" stroke-dasharray="251" stroke-dashoffset="251" stroke="#3b82f6"/>
+                <text x="100" y="95" text-anchor="middle" class="gauge-label" fill="currentColor" id="gauge-text">0%</text>
+                <text x="100" y="112" text-anchor="middle" class="gauge-sublabel" fill="#94a3b8" font-size="10">Risk Score</text>
+            </svg>
+        </div>
+        <div class="prob-wrapper">
+            <div class="prob-bar-container"><div class="prob-fill" id="prob-fill"></div></div>
+            <span id="prob-text">0%</span>
+        </div>
+        <p id="result-description"></p>
+        <div id="insights-container" class="insights-box hidden"></div>
+        <div class="result-actions" id="result-actions">
+            <button class="action-btn" onclick="downloadPDF()">📄 Download PDF Report</button>
+            <button class="action-btn" onclick="shareCard()">🖼️ Save Result Card</button>
+            <a href="{{ url_for('dashboard') }}" class="action-btn">📊 View Dashboard</a>
+        </div>
+    </div>
+</div>
+
+<div class="footer-disclaimer">
+    ⚠️ <strong>Medical Disclaimer:</strong> This AI tool is for educational purposes only. Always consult a qualified healthcare professional.
+</div>
+
+<script>
+function syncRange(targetId, value) {
+    const el = document.getElementById(targetId);
+    if (el) el.value = value;
+    const displayId = targetId + '-display';
+    const display = document.getElementById(displayId);
+    if (display) display.textContent = value;
+}
+
+function toggleAdvanced() {
+    const sec = document.getElementById('advanced-section');
+    const icon = document.getElementById('toggle-icon');
+    const isHidden = sec.classList.toggle('hidden');
+    icon.textContent = isHidden ? '➕' : '➖';
+    updateConfidence();
+}
+
+function updateConfidence() {
+    const inputs = ['age', 'sex', 'cp', 'trestbps', 'chol', 'thalach', 'fbs', 'restecg', 'exang', 'oldpeak', 'slope', 'ca', 'thal'];
+    let filled = 0;
+    inputs.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.value !== "" && el.value !== null) filled++;
+    });
+    
+    const percent = Math.round((filled / 13) * 100);
+    const fill = document.getElementById('confidence-fill');
+    if (fill) fill.style.width = percent + '%';
+    const label = document.getElementById('data-completeness');
+    if (label) label.textContent = percent > 90 ? 'Full (13/13)' : percent > 60 ? 'Advanced ('+filled+'/13)' : 'Basic ('+filled+'/13)';
+    
+    if (fill) {
+        if (percent > 80) fill.style.background = '#10b981';
+        else if (percent > 50) fill.style.background = '#3b82f6';
+        else fill.style.background = '#f59e0b';
+    }
+}
+
+// BMI Calculator
+function calcBMI() {
+    const h = parseFloat(document.getElementById('bmi-height').value) / 100;
+    const w = parseFloat(document.getElementById('bmi-weight').value);
+    const el = document.getElementById('bmi-result');
+    if (!h || !w || h <= 0) { el.textContent = 'BMI: —'; return; }
+    const bmi = (w / (h * h)).toFixed(1);
+    let cat = '', color = '';
+    if (bmi < 18.5) { cat = 'Underweight'; color = '#fde68a'; }
+    else if (bmi < 25) { cat = 'Normal ✅'; color = '#86efac'; }
+    else if (bmi < 30) { cat = 'Overweight ⚠️'; color = '#fde68a'; }
+    else { cat = 'Obese 🔴'; color = '#fca5a5'; }
+    el.innerHTML = `BMI: <strong style="color:${color}">${bmi}</strong><br><small>${cat}</small>`;
+}
+document.getElementById('bmi-height').addEventListener('input', calcBMI);
+document.getElementById('bmi-weight').addEventListener('input', calcBMI);
+
+// Scanning messages
+const messages = ['Analyzing heart signals... 💓','Checking vitals... 🩺','Consulting AI engine... 🤖','Running diagnostics... 🔬','Almost done... ⚡'];
+let msgInterval;
+function startMessages() {
+    let i = 0;
+    const el = document.getElementById('scanningText');
+    if (el) {
+        el.textContent = messages[0];
+        msgInterval = setInterval(() => { i = (i + 1) % messages.length; el.textContent = messages[i]; }, 600);
+    }
+}
+function stopMessages() { clearInterval(msgInterval); }
+
+// Gauge animation
+function animateGauge(percent) {
+    const circumference = 251;
+    const offset = circumference - (percent / 100) * circumference;
+    const path = document.getElementById('gauge-path');
+    const text = document.getElementById('gauge-text');
+    if (!path || !text) return;
+    path.style.stroke = percent >= 50 ? '#ef4444' : '#10b981';
+    path.style.strokeDashoffset = offset;
+    let curr = 0;
+    const interval = setInterval(() => {
+        curr = Math.min(curr + 1, Math.round(percent));
+        text.textContent = curr + '%';
+        if (curr >= Math.round(percent)) clearInterval(interval);
+    }, 20);
+}
+
+function downloadPDF() { if (window._lastPrediction) generateMedicalPDF(window._lastPrediction); }
+function shareCard() {
+    html2canvas(document.getElementById('result-section'), { backgroundColor: '#0f172a', scale: 2 }).then(canvas => {
+        const link = document.createElement('a');
+        link.download = 'my-heart-report.png';
+        link.href = canvas.toDataURL();
+        link.click();
+    });
+}
+</script>
+{% endblock %}

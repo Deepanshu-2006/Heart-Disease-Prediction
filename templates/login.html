@@ -1,0 +1,103 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<!-- Particle Background -->
+<canvas id="particles-canvas"></canvas>
+
+<div class="glass-panel login-panel animate-slide-up">
+    <header>
+        <h1>Heart Disease <span class="accent">AI Portal</span></h1>
+
+    </header>
+
+
+
+    <div class="auth-box">
+        <p class="notice">Enter your name to access the portal.</p>
+
+        <form id="loginForm" class="login-form">
+            <div class="input-group glow-input-group">
+                <input type="text" id="userName" placeholder="Your Name" required autocomplete="off">
+                <span class="focus-border"></span>
+            </div>
+
+            <button type="submit" id="enterBtn" class="submit-btn creative-btn">
+                <span class="btn-text">Initialize Portal</span>
+                <div class="loader hidden"></div>
+            </button>
+        </form>
+    </div>
+</div>
+
+<!-- Medical Disclaimer -->
+<div style="max-width:500px; margin-top:1.5rem; text-align:center; color:#64748b; font-size:0.78rem; padding: 0.8rem 1rem; border: 1px solid rgba(100,116,139,0.2); border-radius: 10px;">
+    ⚠️ <strong style="color:#94a3b8">For educational purposes only.</strong> This tool does not provide medical advice. Always consult a qualified healthcare professional.
+</div>
+
+<script>
+    // Particle background
+    const canvas = document.getElementById('particles-canvas');
+    const ctx = canvas.getContext('2d');
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const particles = Array.from({length: 60}, () => ({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        r: Math.random() * 2 + 0.5,
+        dx: (Math.random() - 0.5) * 0.4,
+        dy: (Math.random() - 0.5) * 0.4,
+        alpha: Math.random() * 0.5 + 0.1
+    }));
+
+    function drawParticles() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        particles.forEach(p => {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(96, 165, 250, ${p.alpha})`;
+            ctx.fill();
+            p.x += p.dx; p.y += p.dy;
+            if (p.x < 0 || p.x > canvas.width) p.dx *= -1;
+            if (p.y < 0 || p.y > canvas.height) p.dy *= -1;
+        });
+        requestAnimationFrame(drawParticles);
+    }
+    drawParticles();
+    window.addEventListener('resize', () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; });
+
+    // Login form
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const btn = document.getElementById('enterBtn');
+        const nameInput = document.getElementById('userName').value;
+        if(!nameInput.trim()) return;
+        btn.querySelector('.btn-text').style.opacity = '0';
+        btn.querySelector('.loader').classList.remove('hidden');
+        btn.disabled = true;
+        try {
+            const response = await fetch('/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: nameInput })
+            });
+            const result = await response.json();
+            if (result.success) {
+                document.querySelector('.login-panel').style.transform = 'scale(0.95)';
+                document.querySelector('.login-panel').style.opacity = '0';
+                setTimeout(() => { window.location.href = "/dashboard"; }, 400);
+            } else {
+                alert("Login Error: " + result.error);
+                btn.querySelector('.btn-text').style.opacity = '1';
+                btn.querySelector('.loader').classList.add('hidden');
+                btn.disabled = false;
+            }
+        } catch (e) {
+            console.error(e);
+            btn.querySelector('.btn-text').style.opacity = '1';
+            btn.querySelector('.loader').classList.add('hidden');
+            btn.disabled = false;
+        }
+    });
+</script>
+{% endblock %}
