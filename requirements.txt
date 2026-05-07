@@ -12,3 +12,4 @@ Flask-SQLAlchemy
 google-auth
 requests
 gunicorn
+python-dotenv

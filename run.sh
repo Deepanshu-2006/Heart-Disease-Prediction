@@ -18,7 +18,8 @@ pip3 install -q \
     numpy \
     scikit-learn \
     xgboost \
-    google-genai
+    google-genai \
+    python-dotenv
 
 echo "✅  Dependencies ready."
 

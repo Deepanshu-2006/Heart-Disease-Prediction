@@ -6,6 +6,11 @@ import pandas as pd
 import numpy as np
 import datetime
 import os
+from dotenv import load_dotenv
+
+# Load local .env file if it exists
+load_dotenv()
+
 try:
     from google import genai as genai_new
     from google.genai import types as genai_types
@@ -360,37 +365,52 @@ def chat():
     if not GEMINI_API_KEY or not _genai_client:
         return jsonify({
             'success': False,
-            'error': 'GEMINI_API_KEY not set. Please add your Gemini API key to environment variables.'
+            'error': '⚙️ CardioBot needs a Gemini API key to work. Please add your GEMINI_API_KEY to the .env file and restart the server.'
         }), 500
 
-    try:
-        # Build full conversation contents
-        contents = []
-        for msg in history[-10:]:
-            role = 'user' if msg['role'] == 'user' else 'model'
-            contents.append(genai_types.Content(role=role, parts=[genai_types.Part(text=msg['content'])]))
-        # Add current user message
-        contents.append(genai_types.Content(role='user', parts=[genai_types.Part(text=user_message)]))
+    # Try models in order of preference, fall back if one is rate-limited
+    MODELS_TO_TRY = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']
 
-        response = _genai_client.models.generate_content(
-            model='gemini-2.0-flash',
-            contents=contents,
-            config=genai_types.GenerateContentConfig(
-                system_instruction=HEART_SYSTEM_PROMPT,
-                temperature=0.7,
-                max_output_tokens=512,
+    # Build full conversation contents
+    contents = []
+    for msg in history[-10:]:
+        role = 'user' if msg['role'] == 'user' else 'model'
+        contents.append(genai_types.Content(role=role, parts=[genai_types.Part(text=msg['content'])]))
+    contents.append(genai_types.Content(role='user', parts=[genai_types.Part(text=user_message)]))
+
+    last_error = None
+    for model_name in MODELS_TO_TRY:
+        try:
+            response = _genai_client.models.generate_content(
+                model=model_name,
+                contents=contents,
+                config=genai_types.GenerateContentConfig(
+                    system_instruction=HEART_SYSTEM_PROMPT,
+                    temperature=0.7,
+                    max_output_tokens=512,
+                )
             )
-        )
-        reply = response.text
-        return jsonify({'success': True, 'reply': reply})
+            reply = response.text
+            if reply:
+                return jsonify({'success': True, 'reply': reply})
+        except Exception as e:
+            last_error = str(e)
+            print(f"CardioBot: Model {model_name} failed — {last_error}")
+            # Only try next model if this was a rate-limit or availability error
+            if '429' not in last_error and '503' not in last_error and 'quota' not in last_error.lower():
+                break  # Non-rate-limit error, don't retry other models
 
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        error_msg = str(e)
-        if "429" in error_msg:
-            error_msg = "CardioBot is currently resting (Rate Limit Reached). Please try again in a minute!"
-        return jsonify({'success': False, 'error': error_msg}), 500
+    # All models failed
+    import traceback
+    traceback.print_exc()
+    if last_error and ('429' in last_error or 'quota' in last_error.lower()):
+        friendly = "😴 CardioBot is busy right now (API rate limit reached). Please wait 30 seconds and try again!"
+    elif last_error and 'API_KEY' in last_error.upper():
+        friendly = "🔑 Your Gemini API key appears to be invalid. Please check the key in your .env file."
+    else:
+        friendly = f"⚠️ CardioBot encountered an error. Please try again in a moment."
+
+    return jsonify({'success': False, 'error': friendly}), 500
 
 
 if __name__ == '__main__':
