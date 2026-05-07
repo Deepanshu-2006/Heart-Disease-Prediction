@@ -101,14 +101,18 @@ with app.app_context():
 
 # --- Model Loading ---
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+model = num_imp = cat_imp = scr = enc = None
 try:
     model   = joblib.load(os.path.join(BASE_DIR, 'heart_disease_model.pkl'))
     num_imp = joblib.load(os.path.join(BASE_DIR, 'num_imputer.pkl'))
     cat_imp = joblib.load(os.path.join(BASE_DIR, 'cat_imputer.pkl'))
     scr     = joblib.load(os.path.join(BASE_DIR, 'scaler.pkl'))
     enc     = joblib.load(os.path.join(BASE_DIR, 'encoder.pkl'))
+    print("✅ All ML models loaded successfully!")
 except Exception as e:
-    print("Warning: Could not load the machine learning model. Make sure to run the pipeline first.", e)
+    import traceback
+    print("❌ Model loading failed:", e)
+    traceback.print_exc()
 
 # --- Routes ---
 @app.route('/login')
