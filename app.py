@@ -107,7 +107,6 @@ try:
     cat_imp = joblib.load(os.path.join(BASE_DIR, 'cat_imputer.pkl'))
     scr     = joblib.load(os.path.join(BASE_DIR, 'scaler.pkl'))
     enc     = joblib.load(os.path.join(BASE_DIR, 'encoder.pkl'))
-
 except Exception as e:
     print("Warning: Could not load the machine learning model. Make sure to run the pipeline first.", e)
 
