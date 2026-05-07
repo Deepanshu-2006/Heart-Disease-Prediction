@@ -653,8 +653,73 @@ body.light-mode .chatbot-input {
 .chatbot-send-btn:hover:not(:disabled) { transform: scale(1.08); box-shadow: 0 6px 16px rgba(99,102,241,0.5); }
 .chatbot-send-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
 
-/* Responsive: smaller on mobile */
-@media (max-width: 480px) {
+/* Responsive: Mobile & Tablets */
+@media (max-width: 768px) {
+    /* Chatbot */
     .chatbot-panel { right: 1rem; left: 1rem; width: auto; bottom: 5rem; }
     .chatbot-fab { right: 1rem; bottom: 1rem; }
+
+    /* Mobile Header */
+    .mobile-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem 1.5rem;
+        background: var(--sidebar-bg);
+        backdrop-filter: blur(20px);
+        border-bottom: 1px solid var(--surface-border);
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        z-index: 1000;
+    }
+    .mobile-logo { display: flex; align-items: center; gap: 0.8rem; font-weight: 600; font-size: 1.1rem; }
+    .avatar-sm { width: 36px; height: 36px; border-radius: 50%; box-shadow: 0 0 5px rgba(0,0,0,0.3); }
+    .menu-toggle { background: transparent; border: none; color: var(--text-primary); cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+    /* Sidebar */
+    .sidebar {
+        transform: translateX(-100%);
+        z-index: 999;
+        transition: transform 0.3s ease;
+        padding-top: 6rem; /* space for mobile header */
+        width: 280px;
+    }
+    .sidebar.active { transform: translateX(0); }
+
+    /* Main Content */
+    .main-content { 
+        margin-left: 0; 
+        width: 100%; 
+        padding: 6rem 1rem 2rem 1rem; 
+    }
+    .full-width-content { 
+        padding-top: 2rem; 
+    }
+
+    /* Grids & Layouts */
+    .form-grid { grid-template-columns: 1fr; }
+    .full-width { grid-column: span 1; }
+    .dashboard-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
+    .history-grid { grid-template-columns: 1fr; }
+
+    /* Glass Panels */
+    .glass-panel { padding: 1.5rem; border-radius: 16px; }
+
+    /* Typography */
+    header h1 { font-size: 2rem; }
+    .gauge-svg { width: 150px; height: 90px; }
+    .gauge-label { font-size: 1.3rem; }
+
+    /* Modal */
+    .modal-box { padding: 1.5rem; margin: 1rem; width: calc(100% - 2rem); }
+    .modal-header h2 { font-size: 1.15rem; }
+    
+    /* BMI Calculator */
+    .bmi-grid { grid-template-columns: 1fr; align-items: stretch; gap: 0.8rem; }
+}
+
+@media (min-width: 769px) {
+    .mobile-header { display: none; }
 }

@@ -11,3 +11,4 @@ flask-cors
 Flask-SQLAlchemy
 google-auth
 requests
+gunicorn

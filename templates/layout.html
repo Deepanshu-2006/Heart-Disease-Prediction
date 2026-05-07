@@ -21,7 +21,18 @@
     </div>
 
     {% if user %}
-    <nav class="sidebar glass-panel-nav animate-fade-in">
+    <!-- Mobile Header -->
+    <div class="mobile-header">
+        <div class="mobile-logo">
+            <img src="{{ user.picture }}" alt="Profile" class="avatar-sm">
+            <span>Cardiology Portal</span>
+        </div>
+        <button class="menu-toggle" onclick="toggleSidebar()" aria-label="Toggle Menu">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+    </div>
+
+    <nav class="sidebar glass-panel-nav animate-fade-in" id="sidebar">
         <div class="user-profile">
             <img src="{{ user.picture }}" alt="Profile" class="avatar">
             <div class="user-info">
@@ -52,6 +63,10 @@
 
     <script src="{{ url_for('static', filename='script.js') }}"></script>
     <script>
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('active');
+        }
+
         function toggleTheme() {
             document.body.classList.toggle('light-mode');
             const isLight = document.body.classList.contains('light-mode');
